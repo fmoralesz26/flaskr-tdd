@@ -13,8 +13,8 @@ from flask import (
     abort,
     jsonify,
 )
+from flask_socketio import SocketIO, send, emit
 from flask_sqlalchemy import SQLAlchemy
-
 
 basedir = Path(__file__).resolve().parent
 
@@ -39,7 +39,7 @@ app.config.from_object(__name__)
 # init sqlalchemy
 db = SQLAlchemy(app)
 
-from project import models
+import models
 
 
 def login_required(f):
@@ -62,10 +62,17 @@ def index():
 
 @app.route("/add", methods=["POST"])
 def add_entry():
-    """Adds new post to the database."""
     if not session.get("logged_in"):
         abort(401)
-    new_entry = models.Post(request.form["title"], request.form["text"])
+    
+    # 1. Extraer los tres campos enviados desde el HTML
+    title = request.form["title"]
+    text = request.form["text"]
+    priority = request.form.get("priority", "Media")
+    
+    # 2. Pasar los tres argumentos al constructor del modelo
+    new_entry = models.Post(title, text, priority)
+    
     db.session.add(new_entry)
     db.session.commit()
     flash("New entry was successfully posted")
@@ -109,7 +116,7 @@ def delete_entry(post_id):
         flash("The entry was deleted.")
     except Exception as e:
         result = {"status": 0, "message": repr(e)}
-    return jsonify(result)
+    return redirect(url_for("index"))
 
 
 @app.route("/search/", methods=["GET"])
@@ -119,7 +126,6 @@ def search():
     if query:
         return render_template("search.html", entries=entries, query=query)
     return render_template("search.html")
-
 
 if __name__ == "__main__":
     app.run()
